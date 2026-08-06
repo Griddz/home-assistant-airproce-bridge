@@ -1,0 +1,285 @@
+"""Config flow for AirProce Socket B Bridge."""
+
+from __future__ import annotations
+
+from typing import Any, override
+
+import voluptuous as vol
+
+from homeassistant import data_entry_flow
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
+    TextSelector,
+    TextSelectorConfig,
+    TextSelectorType,
+)
+
+from .models import BridgeConfig
+from .const import (
+    CONF_BASE_TOPIC,
+    CONF_DEVICE_ID,
+    CONF_DEVICE_MODEL,
+    CONF_DEVICE_NAME,
+    CONF_DISCOVERY_PREFIX,
+    CONF_LISTEN_HOST,
+    CONF_LISTEN_PORT,
+    CONF_MQTT_HOST,
+    CONF_MQTT_PASSWORD,
+    CONF_MQTT_PORT,
+    CONF_MQTT_USERNAME,
+    CONF_USR_HOST,
+    CONF_USR_PASSWORD,
+    CONF_USR_USERNAME,
+    CONF_USR_WEB_PORT,
+    CONF_VERIFY_USR_WEB,
+    CONF_WATCHDOG_SILENCE,
+    CONF_WATCHDOG_TIMEOUT,
+    DEFAULT_BASE_TOPIC,
+    DEFAULT_DEVICE_MODEL,
+    DEFAULT_DEVICE_NAME,
+    DEFAULT_DISCOVERY_PREFIX,
+    DEFAULT_LISTEN_HOST,
+    DEFAULT_LISTEN_PORT,
+    DEFAULT_MQTT_PORT,
+    DEFAULT_USR_PASSWORD,
+    DEFAULT_USR_USERNAME,
+    DEFAULT_USR_WEB_PORT,
+    DEFAULT_VERIFY_USR_WEB,
+    DEFAULT_WATCHDOG_SILENCE,
+    DEFAULT_WATCHDOG_TIMEOUT,
+    DOMAIN,
+)
+from .validation import (
+    CannotConnectMqtt,
+    CannotConnectUsr,
+    InvalidMqttAuth,
+    InvalidUsrAuth,
+    validate_config,
+)
+
+_PASSWORD_SELECTOR = TextSelector(
+    TextSelectorConfig(type=TextSelectorType.PASSWORD)
+)
+
+
+def _default_device_id(host: str) -> str:
+    return f"airproce_{host.replace('.', '_').replace(':', '_')}"
+
+
+def _build_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+    defaults = defaults or {}
+    usr_host = defaults.get(CONF_USR_HOST, "")
+
+    device_schema = vol.Schema(
+        {
+            vol.Required(
+                CONF_DEVICE_NAME,
+                default=defaults.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME),
+            ): cv.string,
+            vol.Required(
+                CONF_DEVICE_MODEL,
+                default=defaults.get(CONF_DEVICE_MODEL, DEFAULT_DEVICE_MODEL),
+            ): cv.string,
+            vol.Required(
+                CONF_DEVICE_ID,
+                default=defaults.get(
+                    CONF_DEVICE_ID,
+                    _default_device_id(usr_host) if usr_host else "airproce_ai600",
+                ),
+            ): cv.string,
+            vol.Required(CONF_USR_HOST, default=usr_host): cv.string,
+            vol.Required(
+                CONF_USR_WEB_PORT,
+                default=defaults.get(CONF_USR_WEB_PORT, DEFAULT_USR_WEB_PORT),
+            ): cv.port,
+            vol.Required(
+                CONF_USR_USERNAME,
+                default=defaults.get(CONF_USR_USERNAME, DEFAULT_USR_USERNAME),
+            ): cv.string,
+            vol.Required(
+                CONF_USR_PASSWORD,
+                default=defaults.get(CONF_USR_PASSWORD, DEFAULT_USR_PASSWORD),
+            ): _PASSWORD_SELECTOR,
+            vol.Required(
+                CONF_VERIFY_USR_WEB,
+                default=defaults.get(CONF_VERIFY_USR_WEB, DEFAULT_VERIFY_USR_WEB),
+            ): cv.boolean,
+            vol.Required(
+                CONF_LISTEN_HOST,
+                default=defaults.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST),
+            ): cv.string,
+            vol.Required(
+                CONF_LISTEN_PORT,
+                default=defaults.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT),
+            ): cv.port,
+        }
+    )
+
+    mqtt_schema = vol.Schema(
+        {
+            vol.Required(
+                CONF_MQTT_HOST,
+                default=defaults.get(CONF_MQTT_HOST, ""),
+            ): cv.string,
+            vol.Required(
+                CONF_MQTT_PORT,
+                default=defaults.get(CONF_MQTT_PORT, DEFAULT_MQTT_PORT),
+            ): cv.port,
+            vol.Optional(
+                CONF_MQTT_USERNAME,
+                default=defaults.get(CONF_MQTT_USERNAME, ""),
+            ): cv.string,
+            vol.Optional(
+                CONF_MQTT_PASSWORD,
+                default=defaults.get(CONF_MQTT_PASSWORD, ""),
+            ): _PASSWORD_SELECTOR,
+            vol.Required(
+                CONF_BASE_TOPIC,
+                default=defaults.get(CONF_BASE_TOPIC, DEFAULT_BASE_TOPIC),
+            ): cv.string,
+            vol.Required(
+                CONF_DISCOVERY_PREFIX,
+                default=defaults.get(
+                    CONF_DISCOVERY_PREFIX, DEFAULT_DISCOVERY_PREFIX
+                ),
+            ): cv.string,
+        }
+    )
+
+    advanced_schema = vol.Schema(
+        {
+            vol.Required(
+                CONF_WATCHDOG_SILENCE,
+                default=defaults.get(
+                    CONF_WATCHDOG_SILENCE, DEFAULT_WATCHDOG_SILENCE
+                ),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=30,
+                    max=300,
+                    step=5,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="s",
+                )
+            ),
+            vol.Required(
+                CONF_WATCHDOG_TIMEOUT,
+                default=defaults.get(
+                    CONF_WATCHDOG_TIMEOUT, DEFAULT_WATCHDOG_TIMEOUT
+                ),
+            ): NumberSelector(
+                NumberSelectorConfig(
+                    min=2,
+                    max=30,
+                    step=1,
+                    mode=NumberSelectorMode.BOX,
+                    unit_of_measurement="s",
+                )
+            ),
+        }
+    )
+
+    return vol.Schema(
+        {
+            vol.Required("device"): data_entry_flow.section(
+                device_schema, {"collapsed": False}
+            ),
+            vol.Required("mqtt"): data_entry_flow.section(
+                mqtt_schema, {"collapsed": False}
+            ),
+            vol.Required("advanced"): data_entry_flow.section(
+                advanced_schema, {"collapsed": True}
+            ),
+        }
+    )
+
+
+def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **user_input.get("device", {}),
+        **user_input.get("mqtt", {}),
+        **user_input.get("advanced", {}),
+    }
+
+
+class AirProceBridgeConfigFlow(ConfigFlow, domain=DOMAIN):
+    """Handle AirProce Socket B Bridge configuration."""
+
+    VERSION = 1
+
+    async def _validate(self, data: dict[str, Any]) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        try:
+            config = BridgeConfig.from_mapping(data)
+            await self.hass.async_add_executor_job(validate_config, config)
+        except InvalidUsrAuth:
+            errors["base"] = "invalid_usr_auth"
+        except CannotConnectUsr:
+            errors["base"] = "cannot_connect_usr"
+        except InvalidMqttAuth:
+            errors["base"] = "invalid_mqtt_auth"
+        except CannotConnectMqtt:
+            errors["base"] = "cannot_connect_mqtt"
+        except (KeyError, TypeError, ValueError):
+            errors["base"] = "invalid_config"
+        return errors
+
+    @override
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle initial setup."""
+        errors: dict[str, str] = {}
+        suggested: dict[str, Any] | None = None
+
+        if user_input is not None:
+            data = _flatten(user_input)
+            errors = await self._validate(data)
+            suggested = data
+            if not errors:
+                config = BridgeConfig.from_mapping(data)
+                await self.async_set_unique_id(config.device_id)
+                self._abort_if_unique_id_configured()
+                return self.async_create_entry(title=config.device_name, data=data)
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=_build_schema(suggested),
+            errors=errors,
+        )
+
+    @override
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Update all connection and device settings."""
+        entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
+        defaults = dict(entry.data)
+
+        if user_input is not None:
+            data = _flatten(user_input)
+            errors = await self._validate(data)
+            defaults = data
+            if not errors:
+                config = BridgeConfig.from_mapping(data)
+                await self.async_set_unique_id(config.device_id)
+                self._abort_if_unique_id_mismatch(reason="wrong_device")
+                if entry.title != config.device_name:
+                    self.hass.config_entries.async_update_entry(
+                        entry, title=config.device_name
+                    )
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates=data,
+                )
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_build_schema(defaults),
+            errors=errors,
+        )
