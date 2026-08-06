@@ -226,6 +226,10 @@ Socket A 保持官方设置，例如：
 - 控制帧通过逆向分析获得，目前已在 AirProce AI-300 和 AI-600 上验证。
 - 本版本为了保留已经验证稳定的桥接逻辑，创建的是 MQTT Discovery 实体，而不是原生 Home Assistant 平台实体。
 
+## 代码生成说明
+
+本仓库中的全部代码均由 **ChatGPT 5.6** 生成。
+
 ## License
 
 MIT
