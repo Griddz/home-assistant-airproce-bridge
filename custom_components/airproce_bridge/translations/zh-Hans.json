@@ -1,0 +1,85 @@
+{
+  "title": "AirProce Socket B 网桥",
+  "config": {
+    "step": {
+      "user": {
+        "title": "设置 AirProce Socket B 网桥",
+        "description": "请把 USR 模块的 Socket B 设置为连接 Home Assistant 主机及下方监听端口。Socket A 可以继续连接 AirProce 官方云端。",
+        "sections": {
+          "device": {"name": "USR 模块与净化器"},
+          "mqtt": {"name": "MQTT Broker"},
+          "advanced": {"name": "主动看门狗"}
+        },
+        "data": {
+          "device_name": "设备名称",
+          "device_model": "净化器型号",
+          "device_id": "稳定设备 ID",
+          "usr_host": "USR 模块 IP 地址",
+          "usr_web_port": "USR 网页端口",
+          "usr_username": "USR 用户名",
+          "usr_password": "USR 密码",
+          "verify_usr_web": "验证 USR 网页登录",
+          "listen_host": "Socket B 监听地址",
+          "listen_port": "Socket B 监听端口",
+          "mqtt_host": "MQTT Broker 地址",
+          "mqtt_port": "MQTT Broker 端口",
+          "mqtt_username": "MQTT 用户名",
+          "mqtt_password": "MQTT 密码",
+          "base_topic": "MQTT 基础主题",
+          "discovery_prefix": "MQTT Discovery 前缀",
+          "watchdog_silence": "无有效状态后开始查询的秒数",
+          "watchdog_timeout": "每次看门狗查询的等待秒数"
+        },
+        "data_description": {
+          "device_id": "建议只用小写字母、数字和下划线。该值用于 MQTT 实体的 unique_id，设置完成后不要随意修改。",
+          "usr_username": "USR 模块常见默认用户名为 admin。",
+          "usr_password": "USR 模块常见默认密码为 admin。",
+          "verify_usr_web": "验证网页可访问性以及 HTTP Basic/Digest 登录。当前版本不会自动修改 USR 参数。",
+          "listen_host": "通常保持 0.0.0.0。Socket B 中应填写 Home Assistant 的局域网 IP，而不是 0.0.0.0。",
+          "base_topic": "每台净化器应使用不同主题，例如 airproce/bedroom。",
+          "watchdog_silence": "净化器通常约 15 秒主动上报一次，默认 45 秒可避免不必要轮询。"
+        }
+      },
+      "reconfigure": {
+        "title": "重新配置 AirProce Socket B 网桥",
+        "description": "修改监听端口或 MQTT 连接后，集成会自动重新加载。",
+        "sections": {
+          "device": {"name": "USR 模块与净化器"},
+          "mqtt": {"name": "MQTT Broker"},
+          "advanced": {"name": "主动看门狗"}
+        },
+        "data": {
+          "device_name": "设备名称",
+          "device_model": "净化器型号",
+          "device_id": "稳定设备 ID",
+          "usr_host": "USR 模块 IP 地址",
+          "usr_web_port": "USR 网页端口",
+          "usr_username": "USR 用户名",
+          "usr_password": "USR 密码",
+          "verify_usr_web": "验证 USR 网页登录",
+          "listen_host": "Socket B 监听地址",
+          "listen_port": "Socket B 监听端口",
+          "mqtt_host": "MQTT Broker 地址",
+          "mqtt_port": "MQTT Broker 端口",
+          "mqtt_username": "MQTT 用户名",
+          "mqtt_password": "MQTT 密码",
+          "base_topic": "MQTT 基础主题",
+          "discovery_prefix": "MQTT Discovery 前缀",
+          "watchdog_silence": "无有效状态后开始查询的秒数",
+          "watchdog_timeout": "每次看门狗查询的等待秒数"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect_usr": "无法连接 USR 模块网页。",
+      "invalid_usr_auth": "USR 用户名或密码不正确。",
+      "cannot_connect_mqtt": "无法连接 MQTT Broker。",
+      "invalid_mqtt_auth": "MQTT 用户名或密码不正确。",
+      "invalid_config": "配置内容无效。"
+    },
+    "abort": {
+      "already_configured": "这台 AirProce 网桥已经配置。",
+      "wrong_device": "稳定设备 ID 与现有配置不一致。"
+    }
+  }
+}
