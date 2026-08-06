@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760">
+  <rect width="1200" height="760" fill="#8d8d8d"/>
+  <rect x="45" y="10" width="1110" height="735" fill="#f7f7f7" stroke="#ffffff" stroke-width="3"/>
+  <rect x="45" y="10" width="1110" height="42" fill="#929292"/>
+  <text x="70" y="38" font-family="Arial, sans-serif" font-size="18" fill="#fff">Web: V2.3.2　 Firmware: V2.2.3</text>
+  <text x="1095" y="38" text-anchor="end" font-family="Arial, sans-serif" font-size="18" text-decoration="underline" fill="#fff">English</text>
+
+  <rect x="45" y="56" width="1110" height="112" fill="#0870ad"/>
+  <circle cx="140" cy="95" r="20" fill="#ff6b00" stroke="#fff" stroke-width="3"/>
+  <text x="215" y="120" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="38" font-weight="700" fill="#fff">有人物联网</text>
+  <text x="215" y="148" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15" fill="#fff">—物联网之联网专家—</text>
+  <text x="870" y="120" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="34" font-weight="700" fill="#ff6b00">有人</text>
+  <text x="950" y="120" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="28" font-weight="700" fill="#fff">在认真做事！</text>
+
+  <rect x="45" y="170" width="180" height="530" fill="#0870ad"/>
+  <g font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="18" fill="#fff">
+    <text x="62" y="205">系统状态</text>
+    <text x="62" y="250">WiFi 参数</text>
+    <rect x="45" y="268" width="180" height="50" fill="#ff6b00"/>
+    <text x="62" y="300">透传参数</text>
+    <text x="62" y="350">附加功能</text>
+    <text x="62" y="395">系统管理</text>
+    <text x="62" y="440">固件升级</text>
+    <text x="62" y="485">关于有人</text>
+  </g>
+
+  <rect x="232" y="170" width="700" height="530" fill="#fff" stroke="#0870ad" stroke-width="2"/>
+  <rect x="232" y="170" width="700" height="40" fill="#0870ad"/>
+  <text x="582" y="197" text-anchor="middle" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="20" fill="#fff">串口参数设置</text>
+
+  <g font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17" fill="#222">
+    <text x="350" y="245">波特率：</text><rect x="465" y="220" width="225" height="34" rx="3" fill="#fff" stroke="#888"/><text x="480" y="244">115200</text>
+    <text x="350" y="290">数据位：</text><rect x="465" y="265" width="225" height="34" rx="3" fill="#fff" stroke="#888"/><text x="480" y="289">8</text>
+    <text x="350" y="335">校验位：</text><rect x="465" y="310" width="225" height="34" rx="3" fill="#fff" stroke="#888"/><text x="480" y="334">None</text>
+    <text x="350" y="380">停止位：</text><rect x="465" y="355" width="225" height="34" rx="3" fill="#fff" stroke="#888"/><text x="480" y="379">1</text>
+  </g>
+
+  <rect x="232" y="405" width="700" height="38" fill="#0870ad"/>
+  <text x="582" y="431" text-anchor="middle" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="19" fill="#fff">网络参数设置</text>
+  <text x="415" y="475" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="17" fill="#222">模式：</text>
+  <rect x="465" y="450" width="225" height="34" rx="3" fill="#fff" stroke="#888"/><text x="480" y="474" font-family="Arial, sans-serif" font-size="17">透明传输模式</text>
+
+  <rect x="232" y="492" width="700" height="38" fill="#0870ad"/>
+  <text x="582" y="518" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#fff">Socket A</text>
+  <g font-family="Arial, sans-serif" font-size="17" fill="#222">
+    <text x="405" y="560">Protocol:</text><rect x="500" y="536" width="190" height="32" fill="#fff" stroke="#888"/><text x="515" y="559">TCP-Client</text>
+    <text x="420" y="598">Port:</text><rect x="500" y="574" width="190" height="32" fill="#fff" stroke="#888"/><text x="515" y="597">8800</text>
+    <text x="365" y="636">Server address:</text><rect x="500" y="612" width="240" height="32" fill="#fff" stroke="#888"/><text x="515" y="635">d2.airproce.com</text>
+  </g>
+
+  <rect x="255" y="650" width="650" height="78" fill="none" stroke="#ff3b30" stroke-width="4"/>
+  <rect x="232" y="650" width="700" height="38" fill="#0870ad"/>
+  <text x="582" y="676" text-anchor="middle" font-family="Arial, sans-serif" font-size="19" fill="#fff">Socket B</text>
+  <text x="278" y="718" font-family="Arial, sans-serif" font-size="16" fill="#222">TCP-Client → &lt;HOME_ASSISTANT_IP&gt; : 9001</text>
+
+  <rect x="940" y="170" width="195" height="530" fill="#0870ad"/>
+  <text x="1037" y="205" text-anchor="middle" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="20" fill="#fff">帮助提示</text>
+  <text x="960" y="245" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15" fill="#fff">• Socket B 必须设为</text>
+  <text x="975" y="270" font-family="Arial, sans-serif" font-size="15" fill="#fff">TCP Client</text>
+  <text x="960" y="310" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15" fill="#fff">• 服务器地址填写</text>
+  <text x="975" y="335" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15" fill="#fff">HA 主机局域网 IP</text>
+  <text x="960" y="375" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15" fill="#fff">• 每台净化器使用</text>
+  <text x="975" y="400" font-family="Arial, 'Microsoft YaHei', sans-serif" font-size="15" fill="#fff">不同监听端口</text>
+</svg>
