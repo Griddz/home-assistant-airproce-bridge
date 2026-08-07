@@ -10,7 +10,6 @@ from .const import (
     CONF_DEVICE_ID,
     CONF_DEVICE_MODEL,
     CONF_DEVICE_NAME,
-    CONF_LISTEN_HOST,
     CONF_LISTEN_PORT,
     CONF_USR_HOST,
     CONF_USR_PASSWORD,
@@ -66,7 +65,9 @@ class BridgeConfig:
             usr_username=str(data.get(CONF_USR_USERNAME, DEFAULT_USR_USERNAME)),
             usr_password=str(data.get(CONF_USR_PASSWORD, DEFAULT_USR_PASSWORD)),
             verify_usr_web=bool(data.get(CONF_VERIFY_USR_WEB, DEFAULT_VERIFY_USR_WEB)),
-            listen_host=str(data.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST)).strip(),
+            # Socket B should accept connections on any Home Assistant IPv4
+            # interface. This is an implementation detail, not a user setting.
+            listen_host=DEFAULT_LISTEN_HOST,
             listen_port=int(data.get(CONF_LISTEN_PORT, DEFAULT_LISTEN_PORT)),
             watchdog_silence=float(
                 data.get(CONF_WATCHDOG_SILENCE, DEFAULT_WATCHDOG_SILENCE)
