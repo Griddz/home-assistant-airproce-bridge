@@ -8,9 +8,18 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
 from . import AirProceConfigEntry
-from .const import CONF_USR_HOST, CONF_USR_PASSWORD, CONF_USR_USERNAME
+from .const import (
+    CONF_DEVICE_ID,
+    CONF_DEVICE_NAME,
+    CONF_USR_HOST,
+    CONF_USR_PASSWORD,
+    CONF_USR_USERNAME,
+    VERSION,
+)
 
 _TO_REDACT = {
+    CONF_DEVICE_ID,
+    CONF_DEVICE_NAME,
     CONF_USR_HOST,
     CONF_USR_USERNAME,
     CONF_USR_PASSWORD,
@@ -27,8 +36,9 @@ async def async_get_config_entry_diagnostics(
     hass: HomeAssistant,
     entry: AirProceConfigEntry,
 ) -> dict[str, Any]:
-    """Return diagnostics with credentials removed."""
+    """Return a privacy-safe diagnostics snapshot for one purifier."""
     return {
+        "integration_version": VERSION,
         "config_entry": async_redact_data(dict(entry.data), _TO_REDACT),
         "runtime": entry.runtime_data.bridge.diagnostics(),
     }
