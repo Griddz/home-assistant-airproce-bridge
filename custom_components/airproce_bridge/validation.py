@@ -1,10 +1,8 @@
-"""Connection validation helpers for AirProce Socket B Bridge."""
+"""Connection validation helpers for AirProce."""
 
 from __future__ import annotations
 
 import socket
-import threading
-from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import (
     HTTPBasicAuthHandler,
@@ -12,8 +10,6 @@ from urllib.request import (
     HTTPPasswordMgrWithDefaultRealm,
     build_opener,
 )
-
-import paho.mqtt.client as mqtt
 
 from .models import BridgeConfig
 
@@ -24,14 +20,6 @@ class CannotConnectUsr(Exception):
 
 class InvalidUsrAuth(Exception):
     """Raised when USR credentials are rejected."""
-
-
-class CannotConnectMqtt(Exception):
-    """Raised when the MQTT broker cannot be reached."""
-
-
-class InvalidMqttAuth(Exception):
-    """Raised when MQTT credentials are rejected."""
 
 
 def validate_usr(config: BridgeConfig) -> None:
@@ -71,71 +59,6 @@ def validate_usr(config: BridgeConfig) -> None:
         raise CannotConnectUsr from exc
 
 
-def _reason_code_value(reason_code: Any) -> int:
-    value = getattr(reason_code, "value", reason_code)
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return -1
-
-
-def validate_mqtt(config: BridgeConfig) -> None:
-    """Validate MQTT network access and credentials."""
-    connected = threading.Event()
-    result: dict[str, int] = {"code": -1}
-
-    try:
-        client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"airproce-config-check-{config.device_id}",
-            clean_session=True,
-        )
-    except (AttributeError, TypeError):
-        client = mqtt.Client(
-            client_id=f"airproce-config-check-{config.device_id}",
-            clean_session=True,
-        )
-
-    if config.mqtt_username:
-        client.username_pw_set(config.mqtt_username, config.mqtt_password)
-
-    def on_connect(
-        client_obj: mqtt.Client,
-        userdata: Any,
-        flags: Any,
-        reason_code: Any,
-        properties: Any = None,
-    ) -> None:
-        result["code"] = _reason_code_value(reason_code)
-        connected.set()
-
-    client.on_connect = on_connect
-
-    try:
-        client.connect(config.mqtt_host, config.mqtt_port, keepalive=10)
-        client.loop_start()
-        if not connected.wait(5):
-            raise CannotConnectMqtt
-        if result["code"] in (4, 5, 134, 135):
-            raise InvalidMqttAuth
-        if result["code"] != 0:
-            raise CannotConnectMqtt
-    except InvalidMqttAuth:
-        raise
-    except (OSError, mqtt.MQTTException) as exc:
-        raise CannotConnectMqtt from exc
-    finally:
-        try:
-            client.disconnect()
-        except Exception:
-            pass
-        try:
-            client.loop_stop()
-        except Exception:
-            pass
-
-
 def validate_config(config: BridgeConfig) -> None:
-    """Validate all external endpoints."""
+    """Validate the external endpoint used by the integration."""
     validate_usr(config)
-    validate_mqtt(config)
