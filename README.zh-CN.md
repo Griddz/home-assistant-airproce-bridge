@@ -125,23 +125,21 @@ custom_components/airproce_bridge
 AirProce
 ```
 
-配置页面已经简化。正常使用时，主页面只需要填写：
+配置页面尽量只保留用户真正需要设置的内容。主页面包括：
 
 - 设备名称
 - 净化器型号
 - USR 模块 IP 地址
 - Socket B 监听端口
 
-折叠的 **高级设置** 中才包含：
+折叠的 **高级设置** 中只保留可能实际需要修改的参数：
 
-- 稳定设备 ID
 - USR 网页端口
 - USR 用户名和密码
 - 是否验证 USR 登录
-- Socket B 监听地址
 - 看门狗时间参数
 
-首次添加时“稳定设备 ID”可以留空，集成会根据 USR IP 自动生成并保存。建立后建议不要再修改，以保持 Home Assistant 中的设备和实体 ID 稳定。
+“监听地址”和“稳定设备 ID”等实现细节不再显示给用户。集成内部固定监听 `0.0.0.0`，因此净化器的 Socket B 只需连接 Home Assistant 的局域网 IP。稳定设备 ID 会在首次添加时自动生成并保存，之后重新配置时继续沿用，避免设备和实体 ID 因配置修改而变化。
 
 ### 配置 Socket B
 
@@ -165,13 +163,14 @@ Home Assistant 中填写的 USR 登录信息只用于验证管理网页是否可
 
 ## 第二台及更多净化器
 
-每台净化器添加一个独立的 AirProce 配置项。以下三项必须不同：
+每台净化器添加一个独立的 AirProce 配置项。以下两项必须不同：
 
 | 配置项 | 第一台示例 | 第二台示例 |
 |---|---|---|
-| 稳定设备 ID | `airproce_ai600_bedroom` | `airproce_ai300_livingroom` |
 | USR 模块 IP | `192.168.1.112` | `192.168.1.113` |
 | Socket B 监听端口 | `9001` | `9002` |
+
+设备名称也建议按房间或型号区分，方便在 Home Assistant 中识别。
 
 多台设备可以共用：
 
@@ -206,7 +205,7 @@ Socket B 断开后，原生 Fan 和 Sensor 会显示“不可用”。USR 模块
 
 ## 从 0.1.x 版本升级
 
-0.1.x 内部使用 MQTT Bridge + MQTT Discovery。0.2.0 起彻底改成原生 Home Assistant 实体，AirProce 本身不再需要 MQTT。
+0.1.x 内部使用 MQTT Bridge + MQTT Discovery。0.2.0 及以后版本彻底改成原生 Home Assistant 实体，AirProce 本身不再需要 MQTT。
 
 升级时集成会：
 
