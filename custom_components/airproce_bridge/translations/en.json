@@ -1,85 +1,83 @@
 {
-  "title": "AirProce Socket B Bridge",
+  "title": "AirProce",
   "config": {
     "step": {
       "user": {
-        "title": "Set up AirProce Socket B Bridge",
-        "description": "Socket B must connect to the Home Assistant host and the configured listening port. Socket A can remain connected to the official AirProce cloud.",
+        "title": "Set up AirProce",
+        "description": "AirProce connects directly to Home Assistant through the purifier's USR Socket B. MQTT is not required. Keep Socket A connected to the official AirProce cloud if you want to continue using the official app.",
         "sections": {
-          "device": {"name": "USR module and purifier"},
-          "mqtt": {"name": "MQTT broker"},
-          "advanced": {"name": "Watchdog"}
+          "basic": {"name": "Purifier"},
+          "advanced": {"name": "Advanced settings"}
         },
         "data": {
           "device_name": "Device name",
           "device_model": "Purifier model",
-          "device_id": "Stable device ID",
           "usr_host": "USR module IP address",
+          "listen_port": "Socket B listening port",
+          "device_id": "Stable device ID",
           "usr_web_port": "USR web port",
           "usr_username": "USR username",
           "usr_password": "USR password",
           "verify_usr_web": "Verify the USR web login",
           "listen_host": "Socket B listening address",
-          "listen_port": "Socket B listening port",
-          "mqtt_host": "MQTT broker host",
-          "mqtt_port": "MQTT broker port",
-          "mqtt_username": "MQTT username",
-          "mqtt_password": "MQTT password",
-          "base_topic": "MQTT base topic",
-          "discovery_prefix": "MQTT discovery prefix",
           "watchdog_silence": "Seconds without a valid state before querying",
           "watchdog_timeout": "Seconds to wait for each watchdog query"
         },
         "data_description": {
-          "device_id": "Use lowercase letters, numbers, and underscores. Do not change it after setup, because it is used for MQTT entity unique IDs.",
+          "usr_host": "Use the purifier/USR module's LAN IP address. A DHCP reservation or static address is recommended.",
+          "listen_port": "Configure the purifier's Socket B TCP client to connect to the Home Assistant LAN IP on this port. Each purifier needs a different listening port.",
+          "device_id": "Optional. Leave blank to generate an ID from the USR IP. Once created, keep this value unchanged so entity IDs remain stable.",
           "usr_username": "Default USR modules commonly use admin.",
           "usr_password": "Default USR modules commonly use admin.",
-          "verify_usr_web": "Checks reachability and HTTP Basic/Digest credentials. This integration does not yet change USR settings automatically.",
-          "listen_host": "Normally keep 0.0.0.0. Configure Socket B to connect to the Home Assistant LAN IP, not 0.0.0.0.",
-          "base_topic": "Use a unique topic for each purifier, for example airproce/bedroom.",
+          "verify_usr_web": "Checks reachability and HTTP Basic/Digest credentials. The integration does not change USR settings automatically.",
+          "listen_host": "Normally keep 0.0.0.0. In the USR page, Socket B must point to the Home Assistant LAN IP, not 0.0.0.0.",
           "watchdog_silence": "The purifier normally reports about every 15 seconds. The default 45 seconds avoids unnecessary polling."
         }
       },
       "reconfigure": {
-        "title": "Reconfigure AirProce Socket B Bridge",
-        "description": "Changing the listener or MQTT connection reloads the integration.",
+        "title": "Reconfigure AirProce",
+        "description": "Update purifier, listener, USR login, or watchdog settings. The integration reloads automatically after saving.",
         "sections": {
-          "device": {"name": "USR module and purifier"},
-          "mqtt": {"name": "MQTT broker"},
-          "advanced": {"name": "Watchdog"}
+          "basic": {"name": "Purifier"},
+          "advanced": {"name": "Advanced settings"}
         },
         "data": {
           "device_name": "Device name",
           "device_model": "Purifier model",
-          "device_id": "Stable device ID",
           "usr_host": "USR module IP address",
+          "listen_port": "Socket B listening port",
+          "device_id": "Stable device ID",
           "usr_web_port": "USR web port",
           "usr_username": "USR username",
           "usr_password": "USR password",
           "verify_usr_web": "Verify the USR web login",
           "listen_host": "Socket B listening address",
-          "listen_port": "Socket B listening port",
-          "mqtt_host": "MQTT broker host",
-          "mqtt_port": "MQTT broker port",
-          "mqtt_username": "MQTT username",
-          "mqtt_password": "MQTT password",
-          "base_topic": "MQTT base topic",
-          "discovery_prefix": "MQTT discovery prefix",
           "watchdog_silence": "Seconds without a valid state before querying",
           "watchdog_timeout": "Seconds to wait for each watchdog query"
+        },
+        "data_description": {
+          "listen_port": "Each purifier must use a unique Socket B listening port.",
+          "device_id": "Keep this unchanged after initial setup; it anchors the Home Assistant device and entity IDs."
         }
       }
     },
     "error": {
       "cannot_connect_usr": "Cannot connect to the USR module web interface.",
       "invalid_usr_auth": "The USR username or password was rejected.",
-      "cannot_connect_mqtt": "Cannot connect to the MQTT broker.",
-      "invalid_mqtt_auth": "The MQTT username or password was rejected.",
+      "listen_port_in_use": "Another AirProce entry already uses this Socket B listening port.",
       "invalid_config": "The configuration is invalid."
     },
     "abort": {
-      "already_configured": "This AirProce bridge is already configured.",
+      "already_configured": "This AirProce purifier is already configured.",
       "wrong_device": "The stable device ID does not match the existing entry."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature": {"name": "Temperature"},
+      "humidity": {"name": "Humidity"},
+      "pm25": {"name": "PM2.5"},
+      "voc": {"name": "VOC"}
     }
   }
 }
