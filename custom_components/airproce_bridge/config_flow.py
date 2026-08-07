@@ -77,10 +77,6 @@ def _build_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
 
     advanced_schema = vol.Schema(
         {
-            vol.Optional(
-                CONF_DEVICE_ID,
-                default=defaults.get(CONF_DEVICE_ID, ""),
-            ): cv.string,
             vol.Required(
                 CONF_USR_WEB_PORT,
                 default=defaults.get(CONF_USR_WEB_PORT, DEFAULT_USR_WEB_PORT),
@@ -97,10 +93,6 @@ def _build_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_VERIFY_USR_WEB,
                 default=defaults.get(CONF_VERIFY_USR_WEB, DEFAULT_VERIFY_USR_WEB),
             ): cv.boolean,
-            vol.Required(
-                CONF_LISTEN_HOST,
-                default=defaults.get(CONF_LISTEN_HOST, DEFAULT_LISTEN_HOST),
-            ): cv.string,
             vol.Required(
                 CONF_WATCHDOG_SILENCE,
                 default=defaults.get(
@@ -149,6 +141,19 @@ def _flatten(user_input: dict[str, Any]) -> dict[str, Any]:
         **user_input.get("basic", {}),
         **user_input.get("advanced", {}),
     }
+
+
+def _apply_internal_defaults(
+    data: dict[str, Any],
+    *,
+    existing_device_id: str | None = None,
+) -> dict[str, Any]:
+    """Apply internal settings that should not be exposed in the UI."""
+    result = dict(data)
+    result[CONF_LISTEN_HOST] = DEFAULT_LISTEN_HOST
+    if existing_device_id:
+        result[CONF_DEVICE_ID] = existing_device_id
+    return result
 
 
 class AirProceConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -209,7 +214,7 @@ class AirProceConfigFlow(ConfigFlow, domain=DOMAIN):
         suggested: dict[str, Any] | None = None
 
         if user_input is not None:
-            data = _flatten(user_input)
+            data = _apply_internal_defaults(_flatten(user_input))
             errors, config = await self._validate(data)
             suggested = data
             if not errors and config is not None:
@@ -234,7 +239,11 @@ class AirProceConfigFlow(ConfigFlow, domain=DOMAIN):
         defaults = dict(entry.data)
 
         if user_input is not None:
-            data = _flatten(user_input)
+            existing_device_id = str(entry.data.get(CONF_DEVICE_ID, "")).strip() or None
+            data = _apply_internal_defaults(
+                _flatten(user_input),
+                existing_device_id=existing_device_id,
+            )
             errors, config = await self._validate(
                 data, exclude_entry_id=entry.entry_id
             )
