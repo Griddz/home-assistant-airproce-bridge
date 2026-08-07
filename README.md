@@ -1,10 +1,12 @@
-# AirProce Socket B Bridge for Home Assistant
+# AirProce for Home Assistant
 
 **English** | [简体中文](README.zh-CN.md)
 
-A Home Assistant custom integration for AirProce air purifiers whose internal USR serial-to-network module exposes a second transparent TCP connection (Socket B).
+A native Home Assistant custom integration for AirProce air purifiers whose internal USR serial-to-network module exposes a second transparent TCP connection (Socket B).
 
-The integration keeps the official Socket A/cloud connection and AirProce app working, while Socket B provides local state reporting and control through Home Assistant.
+The integration keeps Socket A connected to the official AirProce cloud so the official app can continue to work, while Socket B connects directly to Home Assistant for local state reporting and control.
+
+**No MQTT broker or Home Assistant MQTT integration is required.**
 
 AirProce product website: [https://airproce.net/](https://airproce.net/)
 
@@ -19,7 +21,7 @@ Other models may use different protocol frames and have not yet been verified.
 
 > **This integration can only be used when the purifier's internal USR transparent-transmission management page is accessible.**
 
-Before installing the integration, open the following address in a browser:
+Before installing the integration, open:
 
 ```text
 http://<PURIFIER_IP>:80
@@ -32,23 +34,25 @@ Username: admin
 Password: admin
 ```
 
-After login, the page should show a USR IoT transparent-transmission interface containing both Socket A and Socket B settings. If this page cannot be opened, the credentials are unknown, or Socket B is not available, this integration cannot use the method documented here.
+After login, the page should show a USR transparent-transmission interface containing both Socket A and Socket B settings. If this page cannot be opened, the credentials are unknown, or Socket B is not available, this integration cannot use the method documented here.
 
 The following privacy-safe illustration is redrawn from a verified USR management page. The exact layout may vary slightly by firmware version:
 
 ![USR transparent transmission web interface](docs/usr-web-interface.svg)
 
-## Entities
+## Native Home Assistant entities
 
-The integration creates the following entities through MQTT Discovery:
+Each purifier is represented as one Home Assistant device with native entities:
 
-- `fan` — power, six manual speeds, `auto`, and `sleep`
+- `fan` — power, six hardware speeds, `auto`, and `sleep`
 - temperature sensor
 - humidity sensor
 - PM2.5 sensor
 - VOC sensor
 
-The fan and all sensors become unavailable when Socket B disconnects or when the watchdog detects a silent half-open TCP connection.
+The six hardware fan speeds are exposed through Home Assistant's standard fan percentage model. Home Assistant therefore displays six percentage steps, while the entity attribute `hardware_speed` reports the actual AirProce speed `1` through `6`.
+
+Socket B disconnects and watchdog failures are reflected directly as entity availability. No MQTT Discovery layer is involved.
 
 ## Architecture
 
@@ -57,20 +61,20 @@ Socket A -> AirProce official cloud
              official app remains available
 
 Socket B -> Home Assistant TCP listener
-             -> protocol parser and controls
-             -> MQTT broker
-             -> Home Assistant MQTT Discovery entities
+             -> AirProce protocol parser
+             -> native fan + sensor entities
 ```
 
-This custom integration preserves the MQTT bridge behavior that was verified in the previous standalone bridge. The custom integration owns the Socket B listener, USR/MQTT configuration, and bridge process. The resulting fan and sensor entities are MQTT-discovered entities and therefore appear under Home Assistant's MQTT integration.
+All control and state handling stays local between the purifier and Home Assistant. After a command, the integration waits for the purifier ACK, requests state, and updates Home Assistant from the confirmed device response.
 
 ## Requirements
 
 1. Home Assistant 2026.6 or later is recommended.
-2. The Home Assistant MQTT integration must already be connected to the same broker entered in this integration.
-3. The USR module must be able to reach the Home Assistant LAN address and configured Socket B listening port.
-4. Only one process can listen on a TCP port. Stop the previous standalone bridge before installing this integration.
-5. You must be able to log in to the purifier's USR management page and configure Socket B manually.
+2. The purifier's USR module must be able to reach the Home Assistant LAN address and configured Socket B listening port.
+3. Only one process can listen on a TCP port. Stop any previous standalone AirProce bridge before installing this integration.
+4. You must be able to log in to the purifier's USR management page and configure Socket B manually.
+
+MQTT is **not** a requirement.
 
 ## Installation
 
@@ -83,7 +87,7 @@ This custom integration preserves the MQTT bridge behavior that was verified in 
 https://github.com/Griddz/home-assistant-airproce-bridge
 ```
 
-3. Install **AirProce Socket B Bridge**.
+3. Install **AirProce**.
 4. Restart Home Assistant.
 
 ### Manual installation
@@ -113,29 +117,35 @@ Settings -> Devices & services -> Add integration
 Search for:
 
 ```text
-AirProce Socket B Bridge
+AirProce
 ```
 
-### USR module and purifier
-
-The setup form contains:
+The setup form is intentionally small. The main section contains only the settings normally required for a purifier:
 
 - device name
 - purifier model
-- stable device ID
 - USR module IP address
+- Socket B listening port
+
+The collapsed **Advanced settings** section contains:
+
+- stable device ID
 - USR web port
-- USR username and password, commonly `admin` / `admin`
-- Socket B listening address and port
+- USR username and password
+- USR login verification
+- Socket B listening address
+- watchdog timings
 
-The USR credentials are used only to verify access to the embedded web interface. Version 0.1.0 does **not** change USR settings automatically.
+The stable device ID may be left blank during first setup. The integration then generates one from the USR IP and stores it in the config entry. After setup, keep the device ID unchanged so Home Assistant device/entity IDs remain stable.
 
-Configure Socket B manually as:
+### Configure Socket B
+
+Configure the purifier's Socket B manually as:
 
 ```text
 Protocol: TCP-Client
 Server:   <HOME_ASSISTANT_LAN_IP>
-Port:     <configured listening port, default 9001 for the first purifier>
+Port:     <the listening port configured in AirProce, default 9001>
 ```
 
 Keep Socket A pointed at the official AirProce cloud, for example:
@@ -146,39 +156,23 @@ Server:   d2.airproce.com
 Port:     8800
 ```
 
-### MQTT broker
-
-The form also contains:
-
-- broker host and port
-- MQTT username and password
-- MQTT base topic
-- Discovery prefix
-
-Every purifier must use a unique MQTT base topic and a unique stable device ID.
-
-### Watchdog
-
-The purifier normally reports state approximately every 15 seconds. The default watchdog waits 45 seconds without a valid state frame before sending a status query. It retries once and, if no valid reply arrives, closes the suspected stale Socket B session and publishes `offline`.
+The USR credentials in Home Assistant are used only to verify that the embedded web interface is reachable and that the login works. The integration does not automatically modify USR settings.
 
 ## Adding a second or additional purifier
 
-For every additional purifier, the following four values **must be different**:
+Each purifier needs its own config entry. The following values must be unique:
 
 | Setting | First purifier example | Second purifier example |
 |---|---|---|
 | Stable device ID | `airproce_ai600_bedroom` | `airproce_ai300_livingroom` |
 | USR module IP | `192.168.1.112` | `192.168.1.113` |
 | Socket B listening port | `9001` | `9002` |
-| MQTT base topic | `airproce/bedroom` | `airproce/livingroom` |
 
 Multiple purifiers may share:
 
 - the same Home Assistant LAN address
-- the same MQTT broker
-- the same MQTT username and password
-- the same Discovery prefix
 - the same default USR username and password
+- the same watchdog settings
 
 Configure the second purifier's Socket B as:
 
@@ -188,30 +182,51 @@ Server:   <THE_SAME_HOME_ASSISTANT_LAN_IP>
 Port:     9002
 ```
 
-Do not reuse the same Socket B listening port or MQTT base topic. A duplicate port prevents the second integration instance from starting; a duplicate base topic causes states and commands from both purifiers to overwrite each other.
-
-Use distinct device names such as `AirProce Bedroom` and `AirProce Living Room`. Avoid changing a stable device ID after setup because Home Assistant may then create a new set of entities.
+The config flow rejects a Socket B listening port that is already used by another AirProce config entry.
 
 ## Control and state behavior
 
-- Manual speeds are 1 through 6.
+- Manual hardware speeds are 1 through 6.
+- Home Assistant exposes them through the standard fan percentage control with six steps.
 - `auto` and `sleep` are fan preset modes.
-- Setting a manual speed clears the preset mode.
+- Setting a manual speed exits the preset mode.
 - The first control byte for `auto` and `sleep` uses the latest valid fan context. This preserves the observed protocol behavior where the sleep command frame depends on the current fan state.
-- After a command, the bridge waits for the command ACK, immediately sends a status query, and publishes the confirmed device state.
+- After a command, the integration waits for the command ACK and immediately sends a status query. Home Assistant is then updated from the purifier's confirmed state rather than an optimistic state.
 
-## Migration from the standalone script
+## Watchdog and availability
+
+The purifier normally reports state approximately every 15 seconds. The default watchdog waits 45 seconds without a valid state frame before sending a status query. It retries once and, if no valid reply arrives, closes the suspected stale Socket B session.
+
+The native fan and sensors become unavailable when Socket B disconnects or when the watchdog closes a stale connection. When the USR module reconnects, Home Assistant requests a fresh state automatically.
+
+## Upgrading from version 0.1.x
+
+Version 0.1.x used an internal MQTT bridge and MQTT Discovery. Version 0.2.0 removes that architecture and creates native Home Assistant entities directly.
+
+On upgrade, the integration:
+
+- removes legacy MQTT settings from the AirProce config entry
+- attempts to clear the old retained AirProce MQTT Discovery topics if the Home Assistant MQTT publish service is available
+- removes the matching old MQTT entity-registry entries
+- keeps the same AirProce `device_id` and the same intended entity IDs where possible
+
+If an old MQTT AirProce entity remains after upgrading, restart Home Assistant once more after confirming the old v0.1 bridge is no longer running. If a retained legacy Discovery message exists on a broker that Home Assistant can no longer reach, it must be cleared on that broker separately.
+
+MQTT can be removed from the AirProce setup after migration; other Home Assistant devices may of course continue using MQTT independently.
+
+## Migration from the standalone Python bridge
 
 1. Stop the old Python script or systemd service.
 2. Confirm that TCP port `9001`, or the selected listening port, is free on the Home Assistant host.
-3. Install and configure this integration.
+3. Install and configure AirProce.
 4. Change USR Socket B to the Home Assistant LAN address and configured port.
 5. Verify that the fan and sensors update promptly.
-6. Remove old retained MQTT Discovery topics if the previous object IDs were different.
+
+No MQTT configuration is needed.
 
 ## Privacy and security
 
-The repository contains no private LAN addresses, MAC addresses, real MQTT usernames or passwords, room names, or user-specific paths. Credentials are stored in the Home Assistant config entry. USR/MQTT hosts, usernames, passwords, and the MQTT base topic are redacted from diagnostics.
+The repository contains no private LAN addresses, MAC addresses, real usernames or passwords, room names, or user-specific paths. USR credentials are stored in the Home Assistant config entry and are redacted from diagnostics.
 
 Review exported Home Assistant config entries and diagnostic files before publishing them.
 
@@ -219,7 +234,7 @@ Review exported Home Assistant config entries and diagnostic files before publis
 
 - USR parameters are not changed automatically because the embedded web form and HTTP interface vary by USR module and firmware.
 - The control frames are reverse engineered and currently verified on AirProce AI-300 and AI-600 purifiers.
-- This release creates MQTT Discovery entities rather than native Home Assistant platform entities to preserve the already-tested bridge behavior.
+- Native Home Assistant fan entities represent discrete fan speeds as percentage steps; the exact hardware level remains available as the `hardware_speed` attribute.
 
 ## Code generation disclosure
 
