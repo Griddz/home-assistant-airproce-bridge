@@ -1,10 +1,12 @@
-"""Constants for the AirProce Socket B bridge integration."""
+"""Constants for the AirProce integration."""
 
 from __future__ import annotations
 
+from homeassistant.const import Platform
+
 DOMAIN = "airproce_bridge"
-NAME = "AirProce Socket B Bridge"
-VERSION = "0.1.0"
+NAME = "AirProce"
+VERSION = "0.2.0"
 
 CONF_DEVICE_NAME = "device_name"
 CONF_DEVICE_MODEL = "device_model"
@@ -16,12 +18,6 @@ CONF_USR_PASSWORD = "usr_password"
 CONF_VERIFY_USR_WEB = "verify_usr_web"
 CONF_LISTEN_HOST = "listen_host"
 CONF_LISTEN_PORT = "listen_port"
-CONF_MQTT_HOST = "mqtt_host"
-CONF_MQTT_PORT = "mqtt_port"
-CONF_MQTT_USERNAME = "mqtt_username"
-CONF_MQTT_PASSWORD = "mqtt_password"
-CONF_BASE_TOPIC = "base_topic"
-CONF_DISCOVERY_PREFIX = "discovery_prefix"
 CONF_WATCHDOG_SILENCE = "watchdog_silence"
 CONF_WATCHDOG_TIMEOUT = "watchdog_timeout"
 
@@ -33,10 +29,20 @@ DEFAULT_USR_PASSWORD = "admin"
 DEFAULT_VERIFY_USR_WEB = True
 DEFAULT_LISTEN_HOST = "0.0.0.0"
 DEFAULT_LISTEN_PORT = 9001
-DEFAULT_MQTT_PORT = 1883
-DEFAULT_BASE_TOPIC = "airproce/purifier"
-DEFAULT_DISCOVERY_PREFIX = "homeassistant"
 DEFAULT_WATCHDOG_SILENCE = 45
 DEFAULT_WATCHDOG_TIMEOUT = 5
 
-PLATFORMS: tuple[str, ...] = ()
+PLATFORMS: tuple[Platform, ...] = (Platform.FAN, Platform.SENSOR)
+
+# Version 0.1.x stored these values in the config entry. They are removed when
+# the entry is migrated to the native Home Assistant implementation.
+LEGACY_MQTT_KEYS: frozenset[str] = frozenset(
+    {
+        "mqtt_host",
+        "mqtt_port",
+        "mqtt_username",
+        "mqtt_password",
+        "base_topic",
+        "discovery_prefix",
+    }
+)
