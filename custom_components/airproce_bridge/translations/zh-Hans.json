@@ -14,29 +14,25 @@
           "device_model": "净化器型号",
           "usr_host": "USR 模块 IP 地址",
           "listen_port": "Socket B 监听端口",
-          "device_id": "稳定设备 ID",
           "usr_web_port": "USR 网页端口",
           "usr_username": "USR 用户名",
           "usr_password": "USR 密码",
           "verify_usr_web": "验证 USR 网页登录",
-          "listen_host": "Socket B 监听地址",
           "watchdog_silence": "无有效状态后开始查询的秒数",
           "watchdog_timeout": "每次看门狗查询的等待秒数"
         },
         "data_description": {
           "usr_host": "填写净化器/USR 模块的局域网 IP，建议在路由器中固定 DHCP 地址或使用静态 IP。",
           "listen_port": "请把净化器 Socket B 的 TCP Client 指向 Home Assistant 局域网 IP 和此端口。每台净化器必须使用不同端口。",
-          "device_id": "可留空，集成会根据 USR IP 自动生成。创建后建议不要修改，以保持 Home Assistant 实体 ID 稳定。",
           "usr_username": "USR 模块常见默认用户名为 admin。",
           "usr_password": "USR 模块常见默认密码为 admin。",
           "verify_usr_web": "验证网页可访问性以及 HTTP Basic/Digest 登录。本集成不会自动修改 USR 参数。",
-          "listen_host": "通常保持 0.0.0.0。USR 页面中的 Socket B 应填写 Home Assistant 局域网 IP，而不是 0.0.0.0。",
           "watchdog_silence": "净化器通常约 15 秒主动上报一次，默认 45 秒可避免不必要轮询。"
         }
       },
       "reconfigure": {
         "title": "重新配置 AirProce",
-        "description": "可修改净化器、监听端口、USR 登录或看门狗参数；保存后集成会自动重新加载。",
+        "description": "可修改净化器、Socket B 端口、USR 登录或看门狗参数；保存后集成会自动重新加载。",
         "sections": {
           "basic": {"name": "净化器"},
           "advanced": {"name": "高级设置"}
@@ -46,18 +42,15 @@
           "device_model": "净化器型号",
           "usr_host": "USR 模块 IP 地址",
           "listen_port": "Socket B 监听端口",
-          "device_id": "稳定设备 ID",
           "usr_web_port": "USR 网页端口",
           "usr_username": "USR 用户名",
           "usr_password": "USR 密码",
           "verify_usr_web": "验证 USR 网页登录",
-          "listen_host": "Socket B 监听地址",
           "watchdog_silence": "无有效状态后开始查询的秒数",
           "watchdog_timeout": "每次看门狗查询的等待秒数"
         },
         "data_description": {
-          "listen_port": "每台净化器必须使用不同的 Socket B 监听端口。",
-          "device_id": "首次设置后请保持不变，它用于固定 Home Assistant 设备和实体 ID。"
+          "listen_port": "每台净化器必须使用不同的 Socket B 监听端口。"
         }
       }
     },
@@ -69,7 +62,7 @@
     },
     "abort": {
       "already_configured": "这台 AirProce 净化器已经配置。",
-      "wrong_device": "稳定设备 ID 与现有配置不一致。"
+      "wrong_device": "内部稳定设备 ID 与现有配置不一致。"
     }
   },
   "entity": {
