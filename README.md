@@ -127,16 +127,14 @@ The setup form is intentionally small. The main section contains only the settin
 - USR module IP address
 - Socket B listening port
 
-The collapsed **Advanced settings** section contains:
+The collapsed **Advanced settings** section contains only settings a user may realistically need to change:
 
-- stable device ID
 - USR web port
 - USR username and password
 - USR login verification
-- Socket B listening address
 - watchdog timings
 
-The stable device ID may be left blank during first setup. The integration then generates one from the USR IP and stores it in the config entry. After setup, keep the device ID unchanged so Home Assistant device/entity IDs remain stable.
+Implementation details are not exposed in the UI. The integration always listens on `0.0.0.0` internally so Socket B can connect through the Home Assistant host's LAN address. A stable internal device ID is generated automatically during first setup and preserved on later reconfiguration.
 
 ### Configure Socket B
 
@@ -160,13 +158,14 @@ The USR credentials in Home Assistant are used only to verify that the embedded 
 
 ## Adding a second or additional purifier
 
-Each purifier needs its own config entry. The following values must be unique:
+Each purifier needs its own config entry. The following values must be different for each purifier:
 
 | Setting | First purifier example | Second purifier example |
 |---|---|---|
-| Stable device ID | `airproce_ai600_bedroom` | `airproce_ai300_livingroom` |
 | USR module IP | `192.168.1.112` | `192.168.1.113` |
 | Socket B listening port | `9001` | `9002` |
+
+Use a distinct device name as well if that helps identify rooms or models in Home Assistant.
 
 Multiple purifiers may share:
 
@@ -201,7 +200,7 @@ The native fan and sensors become unavailable when Socket B disconnects or when 
 
 ## Upgrading from version 0.1.x
 
-Version 0.1.x used an internal MQTT bridge and MQTT Discovery. Version 0.2.0 removes that architecture and creates native Home Assistant entities directly.
+Version 0.1.x used an internal MQTT bridge and MQTT Discovery. Version 0.2.0 and later remove that architecture and create native Home Assistant entities directly.
 
 On upgrade, the integration:
 
