@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 from typing import Final
+
+_LOGGER = logging.getLogger(__name__)
+DEBUG_FRAME_MAX_BYTES: Final = 64
 
 # Captured CLOUD_TO_DEVICE control frames. The dynamic sequence and timestamp
 # bytes are not validated by the tested AI-600 firmware and can be replayed.
@@ -25,6 +29,20 @@ CONTROL_SPEED_INDEX: Final = 15
 STATUS_QUERY: Final = bytes.fromhex(
     "00 08 00 04 0b 97 25 00 00 01 9f d0 e7 81 af"
 )
+
+
+def _debug_frame(frame: bytes) -> None:
+    """Log one bounded RX frame only while HA debug logging is enabled."""
+    if not _LOGGER.isEnabledFor(logging.DEBUG):
+        return
+    sample = frame[:DEBUG_FRAME_MAX_BYTES]
+    suffix = " ..." if len(frame) > DEBUG_FRAME_MAX_BYTES else ""
+    _LOGGER.debug(
+        "RX frame len=%d: %s%s",
+        len(frame),
+        sample.hex(" "),
+        suffix,
+    )
 
 
 @dataclass(slots=True)
@@ -68,7 +86,9 @@ class FrameParser:
             if len(self.buffer) < total_length:
                 break
 
-            frames.append(bytes(self.buffer[:total_length]))
+            frame = bytes(self.buffer[:total_length])
+            frames.append(frame)
+            _debug_frame(frame)
             del self.buffer[:total_length]
 
         return frames
@@ -124,7 +144,7 @@ def decode_state(frame: bytes) -> PurifierState | None:
         mode = "unknown"
         speed = speed_code if 1 <= speed_code <= 6 else 0
 
-    return PurifierState(
+    decoded = PurifierState(
         power=power,
         mode=mode,
         speed=speed,
@@ -135,3 +155,17 @@ def decode_state(frame: bytes) -> PurifierState | None:
         raw_mode_code=mode_code,
         raw_speed_code=speed_code,
     )
+    if _LOGGER.isEnabledFor(logging.DEBUG):
+        _LOGGER.debug(
+            "Decoded state: power=%s mode=%s speed=%d pm25=%d temp=%.1f humidity=%.1f voc=%.3f raw_mode=0x%02x raw_speed=0x%02x",
+            decoded.power,
+            decoded.mode,
+            decoded.speed,
+            decoded.pm25,
+            decoded.temperature,
+            decoded.humidity,
+            decoded.voc,
+            decoded.raw_mode_code,
+            decoded.raw_speed_code,
+        )
+    return decoded
