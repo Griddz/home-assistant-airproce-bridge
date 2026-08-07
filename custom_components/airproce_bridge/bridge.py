@@ -1,52 +1,16 @@
-"""AirProce Socket B to MQTT bridge runtime."""
+"""Local Socket B runtime for AirProce purifiers."""
 
 from __future__ import annotations
 
 from dataclasses import asdict
-import json
 import logging
 import socket
 import threading
 import time
+from collections.abc import Callable
 from typing import Any, Final
 
-import paho.mqtt.client as mqtt
-
-from .const import (
-    CONF_BASE_TOPIC,
-    CONF_DEVICE_ID,
-    CONF_DEVICE_MODEL,
-    CONF_DEVICE_NAME,
-    CONF_DISCOVERY_PREFIX,
-    CONF_LISTEN_HOST,
-    CONF_LISTEN_PORT,
-    CONF_MQTT_HOST,
-    CONF_MQTT_PASSWORD,
-    CONF_MQTT_PORT,
-    CONF_MQTT_USERNAME,
-    CONF_USR_HOST,
-    CONF_USR_PASSWORD,
-    CONF_USR_USERNAME,
-    CONF_USR_WEB_PORT,
-    CONF_VERIFY_USR_WEB,
-    CONF_WATCHDOG_SILENCE,
-    CONF_WATCHDOG_TIMEOUT,
-    DEFAULT_BASE_TOPIC,
-    DEFAULT_DEVICE_MODEL,
-    DEFAULT_DEVICE_NAME,
-    DEFAULT_DISCOVERY_PREFIX,
-    DEFAULT_LISTEN_HOST,
-    DEFAULT_LISTEN_PORT,
-    DEFAULT_MQTT_PORT,
-    DEFAULT_USR_PASSWORD,
-    DEFAULT_USR_USERNAME,
-    DEFAULT_USR_WEB_PORT,
-    DEFAULT_VERIFY_USR_WEB,
-    DEFAULT_WATCHDOG_SILENCE,
-    DEFAULT_WATCHDOG_TIMEOUT,
-    NAME,
-    VERSION,
-)
+from .const import NAME, VERSION
 from .models import BridgeConfig
 from .protocol import (
     COMMANDS,
@@ -62,21 +26,24 @@ _LOGGER = logging.getLogger(__name__)
 WATCHDOG_CHECK_INTERVAL: Final = 5.0
 WATCHDOG_RETRY_DELAY: Final = 2.0
 
-
-def _reason_code_value(reason_code: Any) -> int:
-    """Return an integer Paho reason code for callback API v1 or v2."""
-    value = getattr(reason_code, "value", reason_code)
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return -1
+StateCallback = Callable[[PurifierState], None]
+AvailabilityCallback = Callable[[bool], None]
 
 
 class AirProceBridge:
-    """Manage Socket B, MQTT discovery, commands, state, and watchdog."""
+    """Manage Socket B, controls, state decoding, and watchdog."""
 
-    def __init__(self, config: BridgeConfig) -> None:
+    def __init__(
+        self,
+        config: BridgeConfig,
+        *,
+        on_state: StateCallback | None = None,
+        on_availability: AvailabilityCallback | None = None,
+    ) -> None:
         self.config = config
+        self._on_state = on_state
+        self._on_availability = on_availability
+
         self.stop_event = threading.Event()
         self.startup_event = threading.Event()
         self.startup_error: Exception | None = None
@@ -102,262 +69,23 @@ class AirProceBridge:
         self.state_counter = 0
         self.state_condition = threading.Condition(self.state_lock)
 
-        self.mqtt_connected = False
-        self.mqtt = self._create_mqtt_client()
-
-    @property
-    def availability_topic(self) -> str:
-        """Return availability topic."""
-        return f"{self.config.base_topic}/availability"
-
-    def _create_mqtt_client(self) -> mqtt.Client:
-        client_id = f"airproce-bridge-{self.config.device_id}"
-        try:
-            client = mqtt.Client(
-                mqtt.CallbackAPIVersion.VERSION2,
-                client_id=client_id,
-                clean_session=True,
-            )
-        except (AttributeError, TypeError):
-            client = mqtt.Client(client_id=client_id, clean_session=True)
-
-        if self.config.mqtt_username:
-            client.username_pw_set(
-                self.config.mqtt_username,
-                self.config.mqtt_password,
-            )
-        client.will_set(
-            self.availability_topic,
-            payload="offline",
-            qos=1,
-            retain=True,
-        )
-        client.reconnect_delay_set(min_delay=1, max_delay=30)
-        client.on_connect = self._on_mqtt_connect
-        client.on_disconnect = self._on_mqtt_disconnect
-        client.on_message = self._on_mqtt_message
-        return client
-
-    def _device_info(self) -> dict[str, Any]:
-        return {
-            "identifiers": [self.config.device_id],
-            "name": self.config.device_name,
-            "manufacturer": "AirProce",
-            "model": self.config.device_model,
-            "configuration_url": self.config.configuration_url,
-            "sw_version": VERSION,
-        }
-
-    def _on_mqtt_connect(
-        self,
-        client: mqtt.Client,
-        userdata: Any,
-        flags: Any,
-        reason_code: Any,
-        properties: Any = None,
-    ) -> None:
-        code = _reason_code_value(reason_code)
-        if code != 0:
-            self.mqtt_connected = False
-            _LOGGER.error(
-                "MQTT connection rejected for %s: %s",
-                self.config.device_id,
-                reason_code,
-            )
+    def _notify_state(self, state: PurifierState) -> None:
+        callback = self._on_state
+        if callback is None:
             return
-        self.mqtt_connected = True
-        _LOGGER.info("MQTT connected for %s", self.config.device_id)
-        client.subscribe(f"{self.config.base_topic}/set/#", qos=1)
-        self.publish_discovery()
-        self.publish_availability("online" if self.device_online else "offline")
-        if self.last_state is not None:
-            self.publish_state(self.last_state)
-
-    def _on_mqtt_disconnect(self, client: mqtt.Client, userdata: Any, *args: Any) -> None:
-        self.mqtt_connected = False
-        if not self.stop_event.is_set():
-            _LOGGER.warning("MQTT disconnected for %s", self.config.device_id)
-
-    def _on_mqtt_message(self, client: mqtt.Client, userdata: Any, msg: Any) -> None:
-        topic = msg.topic
-        payload = msg.payload.decode("utf-8", errors="replace").strip()
-        _LOGGER.debug("MQTT command %s = %r", topic, payload)
-
         try:
-            if topic.endswith("/set/power"):
-                self.handle_power(payload)
-            elif topic.endswith("/set/percentage"):
-                self.handle_percentage(payload)
-            elif topic.endswith("/set/preset"):
-                self.handle_fan_preset(payload)
-            elif topic.endswith("/set/speed"):
-                self.handle_speed(payload)
-            else:
-                _LOGGER.warning("Unknown AirProce command topic: %s", topic)
+            callback(state)
         except Exception:
-            _LOGGER.exception("Failed to handle AirProce MQTT command")
+            _LOGGER.exception("AirProce state callback failed")
 
-    def _discovery_topics(self) -> list[str]:
-        prefix = self.config.discovery_prefix
-        object_id = self.config.object_id
-        return [
-            f"{prefix}/fan/{object_id}/config",
-            f"{prefix}/sensor/{object_id}_temperature/config",
-            f"{prefix}/sensor/{object_id}_humidity/config",
-            f"{prefix}/sensor/{object_id}_pm25/config",
-            f"{prefix}/sensor/{object_id}_voc/config",
-        ]
-
-    def publish_discovery(self) -> None:
-        """Publish Home Assistant MQTT discovery configuration."""
-        base = self.config.base_topic
-        avail = self.availability_topic
-        device = self._device_info()
-        origin = {
-            "name": NAME,
-            "sw_version": VERSION,
-            "support_url": "https://github.com/Griddz/home-assistant-airproce-bridge",
-        }
-        object_id = self.config.object_id
-
-        discovery_messages = {
-            f"{self.config.discovery_prefix}/fan/{object_id}/config": {
-                "name": None,
-                "unique_id": f"{object_id}_fan",
-                "default_entity_id": f"fan.{object_id}",
-                "icon": "mdi:air-purifier",
-                "availability_topic": avail,
-                "payload_available": "online",
-                "payload_not_available": "offline",
-                "command_topic": f"{base}/set/power",
-                "state_topic": f"{base}/fan/state",
-                "payload_on": "ON",
-                "payload_off": "OFF",
-                "percentage_command_topic": f"{base}/set/percentage",
-                "percentage_state_topic": f"{base}/fan/percentage",
-                "speed_range_min": 1,
-                "speed_range_max": 6,
-                "preset_modes": ["auto", "sleep"],
-                "preset_mode_command_topic": f"{base}/set/preset",
-                "preset_mode_state_topic": f"{base}/fan/preset",
-                "payload_reset_preset_mode": "None",
-                "json_attributes_topic": f"{base}/state",
-                "optimistic": False,
-                "retain": False,
-                "device": device,
-                "origin": origin,
-            },
-            f"{self.config.discovery_prefix}/sensor/{object_id}_temperature/config": {
-                "name": "Temperature",
-                "unique_id": f"{object_id}_temperature",
-                "default_entity_id": f"sensor.{object_id}_temperature",
-                "state_topic": f"{base}/sensor/temperature",
-                "availability_topic": avail,
-                "device_class": "temperature",
-                "state_class": "measurement",
-                "unit_of_measurement": "°C",
-                "suggested_display_precision": 1,
-                "device": device,
-                "origin": origin,
-            },
-            f"{self.config.discovery_prefix}/sensor/{object_id}_humidity/config": {
-                "name": "Humidity",
-                "unique_id": f"{object_id}_humidity",
-                "default_entity_id": f"sensor.{object_id}_humidity",
-                "state_topic": f"{base}/sensor/humidity",
-                "availability_topic": avail,
-                "device_class": "humidity",
-                "state_class": "measurement",
-                "unit_of_measurement": "%",
-                "suggested_display_precision": 1,
-                "device": device,
-                "origin": origin,
-            },
-            f"{self.config.discovery_prefix}/sensor/{object_id}_pm25/config": {
-                "name": "PM2.5",
-                "unique_id": f"{object_id}_pm25",
-                "default_entity_id": f"sensor.{object_id}_pm25",
-                "state_topic": f"{base}/sensor/pm25",
-                "availability_topic": avail,
-                "device_class": "pm25",
-                "state_class": "measurement",
-                "unit_of_measurement": "µg/m³",
-                "suggested_display_precision": 0,
-                "device": device,
-                "origin": origin,
-            },
-            f"{self.config.discovery_prefix}/sensor/{object_id}_voc/config": {
-                "name": "VOC",
-                "unique_id": f"{object_id}_voc",
-                "default_entity_id": f"sensor.{object_id}_voc",
-                "state_topic": f"{base}/sensor/voc",
-                "availability_topic": avail,
-                "device_class": "volatile_organic_compounds",
-                "state_class": "measurement",
-                "unit_of_measurement": "mg/m³",
-                "suggested_display_precision": 3,
-                "device": device,
-                "origin": origin,
-            },
-        }
-
-        for topic, payload in discovery_messages.items():
-            self.mqtt.publish(
-                topic,
-                json.dumps(payload, ensure_ascii=False, separators=(",", ":")),
-                qos=1,
-                retain=True,
-            )
-        _LOGGER.info("Published MQTT discovery for %s", self.config.device_id)
-
-    def clear_discovery(self) -> None:
-        """Delete retained discovery messages for this config entry."""
-        if not self.mqtt_connected:
+    def _notify_availability(self, available: bool) -> None:
+        callback = self._on_availability
+        if callback is None:
             return
-        for topic in self._discovery_topics():
-            info = self.mqtt.publish(topic, payload="", qos=1, retain=True)
-            try:
-                info.wait_for_publish(timeout=2.0)
-            except (RuntimeError, ValueError):
-                _LOGGER.debug(
-                    "Discovery cleanup was not confirmed for %s", topic, exc_info=True
-                )
-
-    def publish_availability(self, state: str) -> None:
-        if self.mqtt_connected:
-            self.mqtt.publish(self.availability_topic, state, qos=1, retain=True)
-
-    def publish_state(self, state: PurifierState) -> None:
-        if not self.mqtt_connected:
-            return
-
-        base = self.config.base_topic
-        fan_state = "ON" if state.power else "OFF"
-        native_speed = 0 if not state.power else (state.speed or self.last_manual_speed)
-        preset = {"auto": "auto", "sleep": "sleep"}.get(state.mode, "None")
-
-        state_payload = asdict(state)
-        state_payload.update(
-            {
-                "fan_state": fan_state,
-                "fan_native_speed": native_speed,
-                "fan_preset": preset,
-                "last_manual_speed": self.last_manual_speed,
-            }
-        )
-
-        messages = {
-            f"{base}/state": json.dumps(state_payload, ensure_ascii=False),
-            f"{base}/sensor/temperature": f"{state.temperature:.1f}",
-            f"{base}/sensor/humidity": f"{state.humidity:.1f}",
-            f"{base}/sensor/pm25": str(state.pm25),
-            f"{base}/sensor/voc": f"{state.voc:.3f}",
-            f"{base}/fan/state": fan_state,
-            f"{base}/fan/percentage": str(native_speed),
-            f"{base}/fan/preset": preset,
-        }
-        for topic, payload in messages.items():
-            self.mqtt.publish(topic, payload, qos=1, retain=True)
+        try:
+            callback(available)
+        except Exception:
+            _LOGGER.exception("AirProce availability callback failed")
 
     def _current_context_speed(self) -> int:
         with self.state_lock:
@@ -415,6 +143,7 @@ class AirProceBridge:
                         del self.pending_acks[sequence]
 
     def send_command(self, name: str, contextual_speed: int | None = None) -> None:
+        """Send a named purifier command and confirm with a status query."""
         if name not in COMMANDS:
             raise ValueError(f"Unknown command: {name}")
         command = bytearray(COMMANDS[name])
@@ -435,6 +164,8 @@ class AirProceBridge:
         ).start()
 
     def request_state_async(self, reason: str = "manual") -> None:
+        """Request device state without blocking the caller."""
+
         def worker() -> None:
             with self.command_lock:
                 try:
@@ -448,41 +179,52 @@ class AirProceBridge:
             daemon=True,
         ).start()
 
-    def handle_power(self, payload: str) -> None:
-        value = payload.strip().lower()
-        if value in ("on", "1", "true"):
-            self.send_command("power_on")
-        elif value in ("off", "0", "false"):
-            self.send_command("power_off")
-        else:
-            raise ValueError(f"Unsupported power payload: {payload!r}")
+    def set_power(self, power: bool) -> None:
+        """Turn the purifier on or off."""
+        self.send_command("power_on" if power else "power_off")
 
-    def handle_percentage(self, payload: str) -> None:
-        value = payload.strip().lower().replace("%", "")
-        native_speed = int(round(float(value)))
-        if native_speed == 0:
-            self.send_command("power_off")
-            return
-        if native_speed not in range(1, 7):
-            raise ValueError("Fan native speed must be 1..6")
-        self.send_command(f"fan_{native_speed}")
+    def set_speed(self, speed: int) -> None:
+        """Set a manual hardware speed from 1 through 6."""
+        if speed not in range(1, 7):
+            raise ValueError("Fan speed must be 1..6")
+        self.send_command(f"fan_{speed}")
 
-    def handle_fan_preset(self, payload: str) -> None:
-        value = payload.strip().lower()
-        if value in ("none", "manual", ""):
-            self.send_command(f"fan_{self.last_manual_speed}")
+    def set_preset(self, preset: str | None) -> None:
+        """Set auto/sleep, or return to the last manual speed."""
+        value = (preset or "").strip().lower()
+        if value in ("", "none", "manual"):
+            self.set_speed(self.last_manual_speed)
         elif value == "auto":
             self.send_command("auto", self._current_context_speed())
         elif value == "sleep":
             self.send_command("sleep", self._current_context_speed())
         else:
-            raise ValueError(f"Unsupported fan preset payload: {payload!r}")
+            raise ValueError(f"Unsupported fan preset: {preset!r}")
+
+    # Compatibility helpers retained for callers/tests from the standalone bridge.
+    def handle_power(self, payload: str) -> None:
+        value = payload.strip().lower()
+        if value in ("on", "1", "true"):
+            self.set_power(True)
+        elif value in ("off", "0", "false"):
+            self.set_power(False)
+        else:
+            raise ValueError(f"Unsupported power payload: {payload!r}")
+
+    def handle_percentage(self, payload: str) -> None:
+        value = payload.strip().lower().replace("%", "")
+        speed = int(round(float(value)))
+        if speed == 0:
+            self.set_power(False)
+            return
+        self.set_speed(speed)
+
+    def handle_fan_preset(self, payload: str) -> None:
+        self.set_preset(payload)
 
     def handle_speed(self, payload: str) -> None:
         speed = int(payload.strip().lower().replace("档", ""))
-        if speed not in range(1, 7):
-            raise ValueError("Fan speed must be 1..6")
-        self.send_command(f"fan_{speed}")
+        self.set_speed(speed)
 
     def _set_device_connection(self, conn: socket.socket, addr: tuple[str, int]) -> None:
         now = time.monotonic()
@@ -501,8 +243,10 @@ class AirProceBridge:
                 old.close()
             except OSError:
                 pass
-        self.publish_availability("online")
-        threading.Timer(0.5, self.request_state_async, args=("connect",)).start()
+        self._notify_availability(True)
+        timer = threading.Timer(0.5, self.request_state_async, args=("connect",))
+        timer.daemon = True
+        timer.start()
 
     def _clear_device_connection(self, conn: socket.socket) -> None:
         with self.device_lock:
@@ -513,7 +257,7 @@ class AirProceBridge:
             self.device_online = False
             self.device_connected_monotonic = 0.0
             self.last_rx_monotonic = 0.0
-        self.publish_availability("offline")
+        self._notify_availability(False)
 
     def _close_stale_connection(self, conn: socket.socket, reason: str) -> None:
         with self.device_lock:
@@ -548,6 +292,7 @@ class AirProceBridge:
             )
 
     def watchdog_loop(self) -> None:
+        """Detect silent half-open Socket B sessions."""
         while not self.stop_event.wait(WATCHDOG_CHECK_INTERVAL):
             with self.device_lock:
                 conn = self.device_socket
@@ -582,6 +327,7 @@ class AirProceBridge:
             self._close_stale_connection(conn, "two watchdog queries had no reply")
 
     def handle_device(self, conn: socket.socket, addr: tuple[str, int]) -> None:
+        """Handle one USR Socket B TCP connection."""
         if addr[0] != self.config.usr_host:
             _LOGGER.warning("Rejected unexpected Socket B client %s:%s", *addr)
             conn.close()
@@ -636,7 +382,7 @@ class AirProceBridge:
                             self.last_manual_speed = state.speed
                         self.state_counter += 1
                         self.state_condition.notify_all()
-                    self.publish_state(state)
+                    self._notify_state(state)
         except (ConnectionError, OSError):
             if not self.stop_event.is_set():
                 _LOGGER.exception("Socket B connection error")
@@ -649,16 +395,9 @@ class AirProceBridge:
             _LOGGER.warning("Socket B disconnected from %s:%s", *addr)
 
     def run(self) -> None:
-        """Run the blocking bridge loop in its dedicated thread."""
+        """Run the blocking Socket B listener in its dedicated thread."""
         _LOGGER.info("Starting %s %s for %s", NAME, VERSION, self.config.device_id)
         try:
-            self.mqtt.connect_async(
-                self.config.mqtt_host,
-                self.config.mqtt_port,
-                keepalive=60,
-            )
-            self.mqtt.loop_start()
-
             threading.Thread(
                 target=self.watchdog_loop,
                 name=f"airproce-watchdog-{self.config.device_id}",
@@ -698,11 +437,11 @@ class AirProceBridge:
             self.startup_error = exc
             self.startup_event.set()
             if not self.stop_event.is_set():
-                _LOGGER.exception("AirProce bridge fatal error")
+                _LOGGER.exception("AirProce listener fatal error")
         finally:
-            self.shutdown(clear_discovery=False)
+            self.shutdown()
 
-    def shutdown(self, *, clear_discovery: bool) -> None:
+    def shutdown(self) -> None:
         """Stop the bridge and close all sockets."""
         with self.shutdown_lock:
             if self.shutdown_done:
@@ -710,9 +449,7 @@ class AirProceBridge:
             self.shutdown_done = True
 
         self.stop_event.set()
-        self.publish_availability("offline")
-        if clear_discovery:
-            self.clear_discovery()
+        self._notify_availability(False)
 
         listener = self.listener_socket
         self.listener_socket = None
@@ -725,6 +462,8 @@ class AirProceBridge:
         with self.device_lock:
             conn = self.device_socket
             self.device_socket = None
+            self.device_address = None
+            self.device_online = False
         if conn is not None:
             try:
                 conn.shutdown(socket.SHUT_RDWR)
@@ -735,12 +474,6 @@ class AirProceBridge:
             except OSError:
                 pass
 
-        try:
-            self.mqtt.disconnect()
-        except Exception:
-            pass
-        self.mqtt.loop_stop()
-
     def diagnostics(self) -> dict[str, Any]:
         """Return a non-secret runtime snapshot."""
         with self.device_lock, self.state_lock:
@@ -750,7 +483,6 @@ class AirProceBridge:
                 "device_peer_port": (
                     self.device_address[1] if self.device_address is not None else None
                 ),
-                "mqtt_connected": self.mqtt_connected,
                 "last_manual_speed": self.last_manual_speed,
                 "state_counter": self.state_counter,
                 "last_state": state,
