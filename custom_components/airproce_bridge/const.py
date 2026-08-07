@@ -6,7 +6,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "airproce_bridge"
 NAME = "AirProce"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 
 CONF_DEVICE_NAME = "device_name"
 CONF_DEVICE_MODEL = "device_model"
