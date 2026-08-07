@@ -14,29 +14,25 @@
           "device_model": "Purifier model",
           "usr_host": "USR module IP address",
           "listen_port": "Socket B listening port",
-          "device_id": "Stable device ID",
           "usr_web_port": "USR web port",
           "usr_username": "USR username",
           "usr_password": "USR password",
           "verify_usr_web": "Verify the USR web login",
-          "listen_host": "Socket B listening address",
           "watchdog_silence": "Seconds without a valid state before querying",
           "watchdog_timeout": "Seconds to wait for each watchdog query"
         },
         "data_description": {
           "usr_host": "Use the purifier/USR module's LAN IP address. A DHCP reservation or static address is recommended.",
           "listen_port": "Configure the purifier's Socket B TCP client to connect to the Home Assistant LAN IP on this port. Each purifier needs a different listening port.",
-          "device_id": "Optional. Leave blank to generate an ID from the USR IP. Once created, keep this value unchanged so entity IDs remain stable.",
           "usr_username": "Default USR modules commonly use admin.",
           "usr_password": "Default USR modules commonly use admin.",
           "verify_usr_web": "Checks reachability and HTTP Basic/Digest credentials. The integration does not change USR settings automatically.",
-          "listen_host": "Normally keep 0.0.0.0. In the USR page, Socket B must point to the Home Assistant LAN IP, not 0.0.0.0.",
           "watchdog_silence": "The purifier normally reports about every 15 seconds. The default 45 seconds avoids unnecessary polling."
         }
       },
       "reconfigure": {
         "title": "Reconfigure AirProce",
-        "description": "Update purifier, listener, USR login, or watchdog settings. The integration reloads automatically after saving.",
+        "description": "Update purifier, Socket B port, USR login, or watchdog settings. The integration reloads automatically after saving.",
         "sections": {
           "basic": {"name": "Purifier"},
           "advanced": {"name": "Advanced settings"}
@@ -46,18 +42,15 @@
           "device_model": "Purifier model",
           "usr_host": "USR module IP address",
           "listen_port": "Socket B listening port",
-          "device_id": "Stable device ID",
           "usr_web_port": "USR web port",
           "usr_username": "USR username",
           "usr_password": "USR password",
           "verify_usr_web": "Verify the USR web login",
-          "listen_host": "Socket B listening address",
           "watchdog_silence": "Seconds without a valid state before querying",
           "watchdog_timeout": "Seconds to wait for each watchdog query"
         },
         "data_description": {
-          "listen_port": "Each purifier must use a unique Socket B listening port.",
-          "device_id": "Keep this unchanged after initial setup; it anchors the Home Assistant device and entity IDs."
+          "listen_port": "Each purifier must use a unique Socket B listening port."
         }
       }
     },
@@ -69,7 +62,7 @@
     },
     "abort": {
       "already_configured": "This AirProce purifier is already configured.",
-      "wrong_device": "The stable device ID does not match the existing entry."
+      "wrong_device": "The internal stable device ID does not match the existing entry."
     }
   },
   "entity": {
