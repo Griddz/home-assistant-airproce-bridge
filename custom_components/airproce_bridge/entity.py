@@ -7,7 +7,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from . import AirProceRuntime
-from .const import DOMAIN, VERSION
+from .const import DOMAIN
 
 
 class AirProceEntity(Entity):
@@ -25,7 +25,6 @@ class AirProceEntity(Entity):
             manufacturer="AirProce",
             model=config.device_model,
             configuration_url=config.configuration_url,
-            sw_version=VERSION,
         )
 
     @property
